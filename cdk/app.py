@@ -28,7 +28,7 @@ APP_CONFIG = app.node.try_get_context("app_config")[DEPLOYMENT_ENVIRONMENT]
 
 stack: PrimeVideoXRayStack = PrimeVideoXRayStack(
     app,
-    f"amazon-prime-vid-xray-{DEPLOYMENT_ENVIRONMENT}",
+    f"{MAIN_RESOURCES_NAME}-{DEPLOYMENT_ENVIRONMENT}",
     MAIN_RESOURCES_NAME,
     APP_CONFIG,
     env={

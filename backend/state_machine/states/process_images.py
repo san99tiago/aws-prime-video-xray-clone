@@ -1,9 +1,7 @@
-# Built-in imports
-from datetime import datetime
-
 # Own imports
 from state_machine.base_step_function import BaseStepFunction
 from common.logger import custom_logger
+from state_machine.processing.image_detection import recognize_celebrities
 
 
 logger = custom_logger()
@@ -24,7 +22,23 @@ class ProcessImages(BaseStepFunction):
 
         self.logger.info("Starting process_images for the chatbot")
 
-        # TODO: add real logic to process image and save results in DynamoDB!!!
-        self.logger.info("Processing images dummy for now...")
+        # Obtain Image details from child workflow execution input
+        s3_bucket_name = self.event.get("s3_bucket_name")
+        s3_key = self.event.get("s3_key")
+
+        logger.info(
+            f"Processing image in s3_bucket_name: {s3_bucket_name}" f" on key: {s3_key}"
+        )
+        result = recognize_celebrities(s3_bucket_name=s3_bucket_name, image_key=s3_key)
+
+        logger.debug(result, message_details="Result")
+        logger.info("Famous people detection finished!")
+
+        # TODO: Add "drawing" faces here!!!
+        self.logger.info("Drawing faces...")
+        # TODO: Save the image with the faces drawn in S3!!!
+        self.logger.info("Saving new screenshots in S3...")
+        # TODO: add save results in DynamoDB!!!
+        self.logger.info("Saving results in DynamoDB...")
 
         return self.event

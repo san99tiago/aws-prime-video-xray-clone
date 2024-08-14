@@ -1,4 +1,5 @@
 # Built-in imports
+import os
 from typing import Optional
 
 # External imports
@@ -32,6 +33,11 @@ class S3Helper:
                 Bucket=self.s3_bucket_name,
                 Key=s3_key,
             )
+
+            # Make sure the "/tmp" directory exists
+            if not os.path.exists(download_path):
+                os.makedirs(os.path.dirname(download_path), exist_ok=True)
+
             with open(download_path, "wb") as f:
                 f.write(response["Body"].read())
             return response

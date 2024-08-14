@@ -7,6 +7,7 @@ from aws_cdk import (
     aws_dynamodb,
     aws_lambda,
     aws_logs,
+    aws_iam,
     aws_s3,
     aws_stepfunctions as aws_sfn,
     aws_stepfunctions_tasks as aws_sfn_tasks,
@@ -54,6 +55,7 @@ class PrimeVideoXRayStack(Stack):
         self.create_state_machine_tasks()
         self.create_state_machine_definition()
         self.create_state_machine()
+        self.configure_additional_permissions()
 
         # Generate CloudFormation outputs
         self.generate_cloudformation_outputs()
@@ -65,7 +67,7 @@ class PrimeVideoXRayStack(Stack):
         self.s3_bucket = aws_s3.Bucket(
             self,
             "S3-Bucket",
-            bucket_name=f"{self.app_config['s3_bucket_prefix']}",
+            bucket_name=f"{self.app_config['s3_bucket_prefix']}-{self.account}",
             removal_policy=RemovalPolicy.DESTROY,
             auto_delete_objects=True,
             versioned=True,
@@ -149,6 +151,27 @@ class PrimeVideoXRayStack(Stack):
             ],
         )
 
+        # Lambda Function for processing images with Rekognition
+        self.lambda_sm_process_images = aws_lambda.Function(
+            self,
+            "Lambda-SM-ProcessImages",
+            runtime=aws_lambda.Runtime.PYTHON_3_11,
+            handler="state_machine/state_machine_handler.lambda_handler",
+            function_name=f"{self.main_resources_name}-process-images",
+            code=aws_lambda.Code.from_asset(PATH_TO_LAMBDA_FUNCTION_FOLDER),
+            timeout=Duration.minutes(1),
+            memory_size=512,
+            environment={
+                "ENVIRONMENT": self.app_config["deployment_environment"],
+                "LOG_LEVEL": self.app_config["log_level"],
+                "S3_BUCKET_NAME": self.s3_bucket.bucket_name,
+            },
+            layers=[
+                self.lambda_layer_powertools,
+                self.lambda_layer_common,
+            ],
+        )
+
     def create_state_machine_tasks(self) -> None:
         """
         Method to create the tasks for the Step Function State Machine.
@@ -172,6 +195,43 @@ class PrimeVideoXRayStack(Stack):
             ),
             output_path="$.Payload",
         )
+
+        self.task_process_images = aws_sfn_tasks.LambdaInvoke(
+            self,
+            "Task-ProcessImages",
+            state_name="ProcessImages",
+            lambda_function=self.lambda_sm_process_images,
+            payload=aws_sfn.TaskInput.from_object(
+                {
+                    "event.$": "$",
+                    "params": {
+                        "class_name": "ProcessImages",
+                        "method_name": "process_images",
+                    },
+                }
+            ),
+            output_path="$.Payload",
+        )
+
+        # Define Distributed Map for enabling huge processing of images
+        self.task_map_distributed = aws_sfn.DistributedMap(
+            self,
+            "Task-MapDistributedState",
+            state_name="Map Distributed",
+            # Used to iterate over this specific object (JSON with a list inside)
+            item_reader=aws_sfn.S3JsonItemReader(
+                bucket=self.s3_bucket,  # TODO: when available in CDK, make it dynamic
+                key="maps/00_distributed_map.json",  # TODO: when available in CDK, make it dynamic
+            ),
+            # Used to write outputs of the processing to an S3 object
+            result_writer=aws_sfn.ResultWriter(
+                bucket=self.s3_bucket,
+                prefix="maps/output/",  # TODO: when available in CDK, make it dynamic
+            ),
+            max_concurrency=100,  # Default max is 10, can be updated to 1000
+        )
+        # Add the item processor for the Distributed Map State
+        self.task_map_distributed.item_processor(self.task_process_images)
 
         # Pass States to simplify State Machine UI understanding
         self.task_pass_initialize = aws_sfn.Pass(
@@ -240,11 +300,9 @@ class PrimeVideoXRayStack(Stack):
 
         # State Machine main definition
         self.state_machine_definition = self.task_convert_video_to_images.next(
-            self.task_pass_initialize.next(self.task_process_success)
+            self.task_map_distributed
         )
-
-        # TODO: Add Distributed Map for processing images
-
+        self.task_map_distributed.next(self.task_process_success)
         self.task_process_success.next(self.task_success)
 
         # TODO: Add failure handling for the State Machine with "process_failure"
@@ -279,7 +337,25 @@ class PrimeVideoXRayStack(Stack):
             ),
         )
 
+    def configure_additional_permissions(self):
+        """
+        Method to configure additional permissions for the resources.
+        """
+        # Grant permissions to the State Machine
         self.s3_bucket.grant_read_write(self.state_machine)
+
+        # Grant permissions to the Lambda Functions
+        self.s3_bucket.grant_read_write(self.lambda_sm_convert_video_to_images)
+        self.dynamodb_table.grant_read_write_data(
+            self.lambda_sm_convert_video_to_images
+        )
+        self.s3_bucket.grant_read_write(self.lambda_sm_process_images)
+        self.dynamodb_table.grant_read_write_data(self.lambda_sm_process_images)
+        self.lambda_sm_process_images.role.add_managed_policy(
+            aws_iam.ManagedPolicy.from_aws_managed_policy_name(
+                "AmazonRekognitionFullAccess"
+            ),
+        )
 
     def generate_cloudformation_outputs(self) -> None:
         """

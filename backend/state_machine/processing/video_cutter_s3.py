@@ -1,5 +1,5 @@
 # Built-in imports
-from typing import Optional
+from typing import Optional, List
 
 # External imports
 import cv2  # Note: for Lambda Functions, I leveraged "opencv-python-headless"
@@ -66,7 +66,7 @@ class VideoCutterS3:
         self,
         temp_screenshot_path: Optional[str] = "/tmp/screenshot.jpg",
         frame_rate: Optional[int] = 1,
-    ):
+    ) -> List[str]:
         """
         Method to extract frames from a video and save them to an S3 bucket in a given folder.
         The frames will be saved as JPG images with the format: screenshot_{frame_time}.jpg
@@ -83,6 +83,7 @@ class VideoCutterS3:
             logger.error("Make sure to call the initialize_video_capture method first")
             raise Exception("Video capture object is not initialized")
 
+        self.screenshots = []
         while True:
             # Set the current position of the video file in milliseconds
             self.video_capture.set(cv2.CAP_PROP_POS_FRAMES, self.frame_count)
@@ -108,6 +109,9 @@ class VideoCutterS3:
             )
             logger.debug(f"Uploaded screenshot to S3: {s3_key_upload}")
 
+            # Add the screenshot to the list of screenshots to be returned
+            self.screenshots.append(s3_key_upload)
+
             # Skip to the next frame based on frame_interval
             self.frame_count += frame_interval
 
@@ -115,3 +119,5 @@ class VideoCutterS3:
 
         # Release the video capture object
         self.video_capture.release()
+
+        return self.screenshots
