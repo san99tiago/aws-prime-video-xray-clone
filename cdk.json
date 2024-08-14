@@ -1,0 +1,19 @@
+{
+  "app": "make clean && make install && python3 cdk/app.py",
+  "context": {
+    "main_resources_name": "prime-vid-xray",
+    "tags": {
+      "Owner": "Santiago Garcia Arango and Santiago Castellanos",
+      "Source": "https://github.com/san99tiago/aws-prime-video-xray-clone",
+      "Usage": "Clone for Amazon Prime Video X Ray to show metadata of movies and series"
+    },
+    "app_config": {
+      "dev": {
+        "deployment_environment": "dev",
+        "log_level": "DEBUG",
+        "s3_bucket_prefix": "prime-vid-xray",
+        "table_name": "prime-vid-xray"
+      }
+    }
+  }
+}
