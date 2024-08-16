@@ -23,6 +23,13 @@ class ConvertVideoToImages(BaseStepFunction):
     def __init__(self, event):
         super().__init__(event, logger=logger)
 
+        # Define class variables for the paths and keys
+        self.LOCAL_VIDEO_PATH = "/tmp/video.mp4"
+        self.LOCAL_SCREENSHOT_PATH = "/tmp/screenshot.jpg"
+        self.DISTRIBUTED_MAP_KEY = "maps/00_distributed_map.json"
+
+        # TODO Add correlation IDs and extra keys to the logger
+
     def convert_video_to_images(self):
         """
         Method to convert the input video into images and save them to S3 accordingly.
@@ -55,24 +62,25 @@ class ConvertVideoToImages(BaseStepFunction):
         input_video_name = s3_key_input_video.split("/")[-1]
         s3_folder_output = f"results/{input_video_name.split('.mp4')[0]}"
 
-        # # TODO: Uncomment after the distributed map tests are done (to avoid re-processing while WIP)
-        # video_cutter = VideoCutterS3(
-        #     s3_bucket_name, s3_key_input_video, s3_folder_output
-        # )
-        # video_cutter.download_video_from_s3("/tmp/video.mp4")
-        # video_cutter.initialize_video_capture("/tmp/video.mp4")
-        # screenshots = video_cutter.extract_frames_and_upload_to_s3(
-        #     "/tmp/screenshot.jpg"
-        # )
-        # self.logger.debug(screenshots, message_details="Screenshots")
-        # self.logger.info("Convert video to images finished successfully")
+        # TODO: Uncomment after the distributed map tests are done (to avoid re-processing while WIP)
+        video_cutter = VideoCutterS3(
+            s3_bucket_name, s3_key_input_video, s3_folder_output
+        )
+        video_cutter.download_video_from_s3(self.LOCAL_VIDEO_PATH)
+        video_cutter.initialize_video_capture(self.LOCAL_VIDEO_PATH)
+        video_cutter.extract_frames_and_upload_to_s3(self.LOCAL_SCREENSHOT_PATH)
+        video_cutter.upload_distributed_map_to_s3(s3_key=self.DISTRIBUTED_MAP_KEY)
+
+        # Really extensive log (only debugging)
+        self.logger.info("Convert video to images finished successfully")
+        self.logger.debug(video_cutter.screenshots, message_details="Screenshots")
 
         self.event.update(
             {
                 "s3_bucket_name": s3_bucket_name,
                 "s3_folder_output": s3_folder_output,
-                # "total_images": len(screenshots),
-                "s3_distributed_map_json": "maps/00_distributed_map.json",  # TODO: Make dynamically
+                "total_images": len(video_cutter.screenshots),
+                "s3_distributed_map_json": self.DISTRIBUTED_MAP_KEY,  # TODO: Make dynamically
             }
         )
 

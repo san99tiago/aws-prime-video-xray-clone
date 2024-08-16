@@ -1,5 +1,5 @@
 # Built-in imports
-from typing import Optional, List
+from typing import Optional, List, Dict
 
 # External imports
 import cv2  # Note: for Lambda Functions, I leveraged "opencv-python-headless"
@@ -66,7 +66,7 @@ class VideoCutterS3:
         self,
         temp_screenshot_path: Optional[str] = "/tmp/screenshot.jpg",
         frame_rate: Optional[int] = 1,
-    ) -> List[str]:
+    ) -> None:
         """
         Method to extract frames from a video and save them to an S3 bucket in a given folder.
         The frames will be saved as JPG images with the format: screenshot_{frame_time}.jpg
@@ -103,14 +103,20 @@ class VideoCutterS3:
 
             # Upload the screenshot to S3 with the correct filename
             s3_key_upload = f"{self.s3_folder_output}/screenshot_{frame_time_str}.jpg"
-            self.s3_helper.upload_object(
+            self.s3_helper.upload_object_from_file(
                 s3_key=s3_key_upload,
                 local_upload_path=temp_screenshot_path,
             )
             logger.debug(f"Uploaded screenshot to S3: {s3_key_upload}")
 
-            # Add the screenshot to the list of screenshots to be returned
-            self.screenshots.append(s3_key_upload)
+            # Add the screenshot to the list of screenshots for the distributed map
+            self.screenshots.append(
+                {
+                    "s3_bucket_name": self.s3_bucket_name,
+                    "s3_key": s3_key_upload,
+                    "frame_time": frame_time,
+                }
+            )
 
             # Skip to the next frame based on frame_interval
             self.frame_count += frame_interval
@@ -120,4 +126,14 @@ class VideoCutterS3:
         # Release the video capture object
         self.video_capture.release()
 
-        return self.screenshots
+    def upload_distributed_map_to_s3(self, s3_key: str):
+        """
+        Method to upload a distributed map JSON to an S3 bucket for further processing.
+            - Note: the screenshots should be located in an attribute "self.screenshots".
+        :param s3_key: The key where the distributed map will be saved.
+        """
+        self.s3_helper.upload_object_from_memory(
+            s3_key=s3_key,
+            data=self.screenshots,
+        )
+        logger.info(f"Uploaded distributed map to the s3_key: {s3_key}")

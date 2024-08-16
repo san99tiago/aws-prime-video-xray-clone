@@ -1,6 +1,7 @@
 # Built-in imports
 import os
-from typing import Optional
+import json
+from typing import Optional, Any
 
 # External imports
 import boto3
@@ -51,7 +52,7 @@ class S3Helper:
             )
             raise exc
 
-    def upload_object(self, s3_key: str, local_upload_path: str) -> None:
+    def upload_object_from_file(self, s3_key: str, local_upload_path: str) -> None:
         """
         Method to upload an object to the S3 bucket.
         :param s3_key (str): The key of the object in the S3 bucket.
@@ -67,7 +68,29 @@ class S3Helper:
 
         except ClientError as exc:
             logger.error(
-                f"upload_object operation failed for: "
+                f"upload_object_from_file operation failed for: "
+                f"bucket_name: {self.s3_bucket_name}. "
+                f"s3_key: {s3_key}. "
+                f"exc: {exc}."
+            )
+            raise exc
+
+    def upload_object_from_memory(self, s3_key: str, data: Any) -> None:
+        """
+        Method to upload a JSON object to an S3 bucket.
+        :param s3_key (str): The key of the object in the S3 bucket.
+        :param data (Any): The in memory data to upload to S3.
+        """
+        try:
+            self.s3_client.put_object(
+                Body=json.dumps(data),
+                Bucket=self.s3_bucket_name,
+                Key=s3_key,
+            )
+
+        except ClientError as exc:
+            logger.error(
+                f"upload_object_from_file operation failed for: "
                 f"bucket_name: {self.s3_bucket_name}. "
                 f"s3_key: {s3_key}. "
                 f"exc: {exc}."

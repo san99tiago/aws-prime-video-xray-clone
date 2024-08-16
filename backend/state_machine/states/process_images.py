@@ -15,6 +15,8 @@ class ProcessImages(BaseStepFunction):
     def __init__(self, event):
         super().__init__(event, logger=logger)
 
+        # TODO Add correlation IDs and extra keys to the logger
+
     def process_images(self):
         """
         Method to process the images to the user.
@@ -40,5 +42,11 @@ class ProcessImages(BaseStepFunction):
         self.logger.info("Saving new screenshots in S3...")
         # TODO: add save results in DynamoDB!!!
         self.logger.info("Saving results in DynamoDB...")
+
+        self.event.update(
+            {
+                "results": result,
+            }
+        )
 
         return self.event
