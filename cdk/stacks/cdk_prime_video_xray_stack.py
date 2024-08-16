@@ -8,9 +8,12 @@ from aws_cdk import (
     aws_lambda,
     aws_logs,
     aws_iam,
+    aws_events,
     aws_s3,
+    aws_sqs,
     aws_stepfunctions as aws_sfn,
     aws_stepfunctions_tasks as aws_sfn_tasks,
+    aws_events_targets as aws_targets,
     CfnOutput,
     RemovalPolicy,
     Stack,
@@ -55,6 +58,7 @@ class PrimeVideoXRayStack(Stack):
         self.create_state_machine_tasks()
         self.create_state_machine_definition()
         self.create_state_machine()
+        self.create_event_bridge_rules()
         self.configure_additional_permissions()
 
         # Generate CloudFormation outputs
@@ -71,6 +75,8 @@ class PrimeVideoXRayStack(Stack):
             removal_policy=RemovalPolicy.DESTROY,
             auto_delete_objects=True,
             versioned=True,
+            encryption=aws_s3.BucketEncryption.S3_MANAGED,
+            event_bridge_enabled=True,  # Enable EventBridge notifications for S3
         )
 
     def create_dynamodb_table(self):
@@ -335,6 +341,40 @@ class PrimeVideoXRayStack(Stack):
                 include_execution_data=True,
                 level=aws_sfn.LogLevel.ALL,
             ),
+        )
+
+    def create_event_bridge_rules(self):
+        """
+        Method to create the EventBridge rules to trigger the State Machine.
+        """
+        # DLQ for the input State Machine event
+        dlq_input_to_state_machine = aws_sqs.Queue(
+            self,
+            "SQS-DLQ-InputToStateMachine",
+            queue_name=f"{self.main_resources_name}-s3-event-to-state-machine-dlq",
+            retention_period=Duration.days(7),
+            visibility_timeout=Duration.minutes(30),
+        )
+
+        # Rule to trigger the State Machine when a new video is uploaded to the S3 bucket
+        aws_events.Rule(
+            self,
+            "EventBridge-Rule-S3TriggerStateMachine",
+            rule_name=f"{self.main_resources_name}-s3-rule-to-state-machine",
+            event_pattern=aws_events.EventPattern(
+                detail_type=["Object Created"],
+                source=["aws.s3"],
+                detail={
+                    "bucket": {"name": [self.s3_bucket.bucket_name]},
+                    "object": {"key": [{"wildcard": "videos/*.mp4"}]},
+                },
+            ),
+            targets=[
+                aws_targets.SfnStateMachine(
+                    machine=self.state_machine,
+                    dead_letter_queue=dlq_input_to_state_machine,
+                ),
+            ],
         )
 
     def configure_additional_permissions(self):
