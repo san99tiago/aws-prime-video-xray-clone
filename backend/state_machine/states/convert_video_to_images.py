@@ -26,7 +26,8 @@ class ConvertVideoToImages(BaseStepFunction):
         # Define class variables for the paths and keys
         self.LOCAL_VIDEO_PATH = "/tmp/video.mp4"
         self.LOCAL_SCREENSHOT_PATH = "/tmp/screenshot.jpg"
-        self.DISTRIBUTED_MAP_KEY = "maps/00_distributed_map.json"
+        self.DISTRIBUTED_MAP_KEY = "maps/00_distributed_map.json"  # When CDK constructs supports, change to Dynamic key
+        self.S3_FOLDER_OUTPUT_PREFIX = "results"
 
         # TODO Add correlation IDs and extra keys to the logger
 
@@ -36,12 +37,6 @@ class ConvertVideoToImages(BaseStepFunction):
         """
 
         self.logger.info("Starting convert_video_to_images process...")
-
-        # TODO: Add actual video processing and cutting logic here!!!
-        self.total_images = (
-            10  # TODO: Update from 10 to an actual number of images from video
-        )
-        # TODO: Add saving logic to specific
 
         # TODO: Enhance validations
         s3_bucket_name = self.event.get("detail", {}).get("bucket", {}).get("name")
@@ -60,11 +55,18 @@ class ConvertVideoToImages(BaseStepFunction):
         # TODO: Enhance with better error handling and logging...
         self.logger.info("Starting video cutting process...")
         input_video_name = s3_key_input_video.split("/")[-1]
-        s3_folder_output = f"results/{input_video_name.split('.mp4')[0]}"
+
+        # Define the output folder in S3 (Eg: "results/game_of_thrones/raw")
+        s3_folder_output = (
+            f"{self.S3_FOLDER_OUTPUT_PREFIX}/{input_video_name.split('.mp4')[0]}/raw"
+        )
 
         # TODO: Uncomment after the distributed map tests are done (to avoid re-processing while WIP)
         video_cutter = VideoCutterS3(
-            s3_bucket_name, s3_key_input_video, s3_folder_output
+            s3_bucket_name=s3_bucket_name,
+            input_video_name=input_video_name,
+            s3_key_input_video=s3_key_input_video,
+            s3_folder_output=s3_folder_output,
         )
         video_cutter.download_video_from_s3(self.LOCAL_VIDEO_PATH)
         video_cutter.initialize_video_capture(self.LOCAL_VIDEO_PATH)
@@ -77,10 +79,11 @@ class ConvertVideoToImages(BaseStepFunction):
 
         self.event.update(
             {
+                "input_video_name": input_video_name,
                 "s3_bucket_name": s3_bucket_name,
                 "s3_folder_output": s3_folder_output,
                 "total_images": len(video_cutter.screenshots),
-                "s3_distributed_map_json": self.DISTRIBUTED_MAP_KEY,  # TODO: Make dynamically
+                "s3_distributed_map_json": self.DISTRIBUTED_MAP_KEY,
             }
         )
 

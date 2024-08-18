@@ -59,7 +59,7 @@ class PrimeVideoXRayStack(Stack):
         self.create_state_machine_definition()
         self.create_state_machine()
         self.create_event_bridge_rules()
-        self.configure_additional_permissions()
+        self.configure_iam_permissions()
 
         # Generate CloudFormation outputs
         self.generate_cloudformation_outputs()
@@ -150,6 +150,7 @@ class PrimeVideoXRayStack(Stack):
                 "ENVIRONMENT": self.app_config["deployment_environment"],
                 "LOG_LEVEL": self.app_config["log_level"],
                 "S3_BUCKET_NAME": self.s3_bucket.bucket_name,
+                "DYNAMODB_TABLE_NAME": self.dynamodb_table.table_name,
             },
             layers=[
                 self.lambda_layer_powertools,
@@ -171,6 +172,7 @@ class PrimeVideoXRayStack(Stack):
                 "ENVIRONMENT": self.app_config["deployment_environment"],
                 "LOG_LEVEL": self.app_config["log_level"],
                 "S3_BUCKET_NAME": self.s3_bucket.bucket_name,
+                "DYNAMODB_TABLE_NAME": self.dynamodb_table.table_name,
             },
             layers=[
                 self.lambda_layer_powertools,
@@ -377,9 +379,9 @@ class PrimeVideoXRayStack(Stack):
             ],
         )
 
-    def configure_additional_permissions(self):
+    def configure_iam_permissions(self):
         """
-        Method to configure additional permissions for the resources.
+        Method to configure additional IAM permissions for the resources.
         """
         # Grant permissions to the State Machine
         self.s3_bucket.grant_read_write(self.state_machine)

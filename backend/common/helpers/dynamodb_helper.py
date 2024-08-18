@@ -113,7 +113,7 @@ class DynamoDBHelper:
     def put_item(self, data: dict) -> dict:
         """
         Method to add a single DynamoDB item.
-        :param data (dict): Item to be added in a JSON format (without the "S", "N", "B" approach).
+        :param data (dict): Item to be added in a JSON format (WITHOUT the "S", "N", "B" approach).
         """
         logger.info("Starting put_item operation.")
         logger.debug(data, message_details=f"Data to be added to {self.table_name}")

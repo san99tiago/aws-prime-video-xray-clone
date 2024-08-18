@@ -1,12 +1,12 @@
 # Built-in imports
-from typing import Optional, List, Dict
+from typing import Optional
 
 # External imports
-import cv2  # Note: for Lambda Functions, I leveraged "opencv-python-headless"
+import cv2  # Note: for Lambda Functions, install "opencv-python-headless"
 
 # Own imports
-from common.logger import custom_logger
 from common.helpers.s3_helper import S3Helper
+from common.logger import custom_logger
 
 logger = custom_logger()
 
@@ -24,16 +24,19 @@ class VideoCutterS3:
     def __init__(
         self,
         s3_bucket_name: str,
+        input_video_name: str,
         s3_key_input_video: str,
         s3_folder_output: str,
     ):
         """
         Constructor method to initialize the VideoCutterS3 object.
         :param s3_bucket_name: The name of the S3 bucket.
+        :param input_video_name: The name of the input video file.
         :param s3_key_input_video: The path to the input video file.
         :pram s3_folder_output: The path to the output folder in the S3 bucket.
         """
         self.s3_bucket_name = s3_bucket_name
+        self.input_video_name = input_video_name
         self.s3_key_input_video = s3_key_input_video
         self.s3_folder_output = s3_folder_output
 
@@ -115,6 +118,7 @@ class VideoCutterS3:
                     "s3_bucket_name": self.s3_bucket_name,
                     "s3_key": s3_key_upload,
                     "frame_time": frame_time,
+                    "input_video_name": self.input_video_name,
                 }
             )
 
