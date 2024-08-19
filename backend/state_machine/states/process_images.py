@@ -92,11 +92,12 @@ class ProcessImages(BaseStepFunction):
         logger.info("Famous people detection finished!")
         return recognize_celebrities_response
 
-    def draw_faces(self, rekognition_detect_face_response: dict):
+    def draw_faces(self, rekognition_detect_face_response: dict) -> int:
         """
         Internal method to draw faces on the image.
         :param rekognition_detect_face_response: The response from the Rekognition service
             "recognize_celebrities" API call.
+        :return: The total number of recognized faces.
         """
         logger.info("Drawing faces on the image...")
         # Draw faces on the image
@@ -105,8 +106,9 @@ class ProcessImages(BaseStepFunction):
             rekognition_detect_face_response=rekognition_detect_face_response,
             result_demo_output_path=self.LOCAL_SCREENSHOT_PATH,  # Overwrite the image (for now)
         )
-        image_drawing.draw_faces()
+        total_recognized_faces = image_drawing.draw_faces()
         image_drawing.save_image()
+        return total_recognized_faces
 
     def upload_image_to_s3(self):
         """
