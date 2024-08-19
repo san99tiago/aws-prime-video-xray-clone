@@ -1,5 +1,6 @@
 # Built-in imports
 import os
+import json
 
 # Own imports
 from common.logger import custom_logger
@@ -137,7 +138,9 @@ class ProcessImages(BaseStepFunction):
                 "PK": self.input_video_name,
                 "SK": f"{self.frame_time:05}",  # Pad with zeros up to 5 digits,
                 "celebrities": self.total_celebrities,
-                "rekognition_detect_face_response": rekognition_detect_face_response,
+                "rekognition_detect_face_response": json.dumps(
+                    rekognition_detect_face_response
+                ),
                 "s3_key_raw_image": self.s3_key,
                 "s3_key_processed_image": self.s3_processed_image_key,
                 "s3_bucket_name": self.s3_bucket_name,
