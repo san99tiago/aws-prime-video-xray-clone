@@ -138,7 +138,7 @@ class ProcessImages(BaseStepFunction):
         dynamodb_helper.put_item(
             {
                 "PK": self.input_video_name,
-                "SK": f"{self.frame_time:05}",  # Pad with zeros up to 5 digits,
+                "SK": f"RESULTS#{self.frame_time:05}",  # Pad with zeros up to 5 digits,
                 "celebrities": self.total_celebrities,
                 "rekognition_detect_face_response": json.dumps(
                     rekognition_detect_face_response

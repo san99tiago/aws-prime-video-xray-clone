@@ -237,6 +237,7 @@ class PrimeVideoXRayStack(Stack):
                 prefix="maps/output/",  # TODO: when available in CDK, make it dynamic
             ),
             max_concurrency=100,  # Default max is 10, can be updated to 1000
+            result_path="$.Payload",  # Add original payload to the result
         )
         # Add the item processor for the Distributed Map State
         self.task_map_distributed.item_processor(self.task_process_images)
@@ -253,6 +254,23 @@ class PrimeVideoXRayStack(Stack):
             self,
             "Task-NotImplemented",
             comment="Not implemented yet",
+        )
+
+        self.task_arrange_final_results = aws_sfn_tasks.LambdaInvoke(
+            self,
+            "Task-ArrangeFinalResults",
+            state_name="ArrangeFinalResults",
+            lambda_function=self.lambda_sm_convert_video_to_images,
+            payload=aws_sfn.TaskInput.from_object(
+                {
+                    "event.$": "$",
+                    "params": {
+                        "class_name": "ArrangeFinalResults",
+                        "method_name": "arrange_final_results",
+                    },
+                }
+            ),
+            output_path="$.Payload",
         )
 
         self.task_process_success = aws_sfn_tasks.LambdaInvoke(
@@ -310,7 +328,8 @@ class PrimeVideoXRayStack(Stack):
         self.state_machine_definition = self.task_convert_video_to_images.next(
             self.task_map_distributed
         )
-        self.task_map_distributed.next(self.task_process_success)
+        self.task_map_distributed.next(self.task_arrange_final_results)
+        self.task_arrange_final_results.next(self.task_process_success)
         self.task_process_success.next(self.task_success)
 
         # TODO: Add failure handling for the State Machine with "process_failure"

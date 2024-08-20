@@ -83,7 +83,7 @@ class S3Helper:
         """
         try:
             self.s3_client.put_object(
-                Body=json.dumps(data),
+                Body=json.dumps(data, skipkeys=True, default=str),
                 Bucket=self.s3_bucket_name,
                 Key=s3_key,
             )

@@ -8,5 +8,6 @@
 # States Entrypoints
 from state_machine.states.convert_video_to_images import ConvertVideoToImages  # noqa
 from state_machine.states.process_images import ProcessImages  # noqa
+from state_machine.states.arrange_final_results import ArrangeFinalResults  # noqa
 from state_machine.states.success import Success  # noqa
 from state_machine.states.failure import Failure  # noqa
