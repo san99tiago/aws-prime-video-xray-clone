@@ -79,7 +79,7 @@ class S3Helper:
         """
         Method to upload a JSON object to an S3 bucket.
         :param s3_key (str): The key of the object in the S3 bucket.
-        :param data (Any): The in memory data to upload to S3.
+        :param data (Any): The in memory data to upload to S3 (e.g., a dictionary).
         """
         try:
             self.s3_client.put_object(
@@ -91,6 +91,28 @@ class S3Helper:
         except ClientError as exc:
             logger.error(
                 f"upload_object_from_file operation failed for: "
+                f"bucket_name: {self.s3_bucket_name}. "
+                f"s3_key: {s3_key}. "
+                f"exc: {exc}."
+            )
+            raise exc
+
+    def upload_binary_object(self, s3_key: str, data: bytes) -> None:
+        """
+        Method to upload binary data (e.g., a video file) to an S3 bucket.
+        :param s3_key (str): The key of the object in the S3 bucket.
+        :param data (bytes): The binary data to upload to S3.
+        """
+        try:
+            self.s3_client.put_object(
+                Body=data,
+                Bucket=self.s3_bucket_name,
+                Key=s3_key,
+            )
+
+        except ClientError as exc:
+            logger.error(
+                f"upload_binary_object operation failed for: "
                 f"bucket_name: {self.s3_bucket_name}. "
                 f"s3_key: {s3_key}. "
                 f"exc: {exc}."
