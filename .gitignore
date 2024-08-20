@@ -8,6 +8,7 @@ temp.*
 temp_*.py
 cdk.context.json
 .DS_Store
+backend/chat_ui/local/*.png
 
 # To ignore Lambda Layers files (like Python dependencies)
 modules
