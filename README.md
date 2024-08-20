@@ -8,6 +8,16 @@ Fun OpenSource project to illustrate how "Amazon Prime Video X-Ray Functionality
 
 <img src="assets/aws-prime-video-xray-clone-architecture.png" width=90%> <br>
 
+## Example Results
+
+You will obtain an interactive UI to upload videos and then get the detected elements from each scene:
+
+<img src="assets/aws-prime-video-results-01.png" width=90%> <br>
+
+<img src="assets/aws-prime-video-results-02.png" width=90%> <br>
+
+<img src="assets/aws-prime-video-results-03.png" width=90%> <br>
+
 ### How to deploy this project?
 
 Clone the repository:
