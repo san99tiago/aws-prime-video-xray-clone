@@ -59,9 +59,7 @@ class DynamoDBHelper:
             )
             raise error
 
-    def query_by_pk_and_sk_begins_with(
-        self, partition_key: str, sort_key_portion: str
-    ) -> list[dict]:
+    def query_by_pk_and_sk_begins_with(self, partition_key: str, sort_key_portion: str):
         """
         Method to run a query against DynamoDB with partition key and the sort
         key with <begins-with> functionality on it.

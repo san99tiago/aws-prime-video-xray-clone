@@ -12,7 +12,12 @@
         "deployment_environment": "dev",
         "log_level": "DEBUG",
         "s3_bucket_prefix": "prime-video-xray",
-        "table_name": "prime-video-xray"
+        "table_name": "prime-video-xray",
+        "asg_name": "prime-xray",
+        "sg_cidrs_list": ["0.0.0.0/0"],
+        "min_capacity": 1,
+        "max_capacity": 1,
+        "desired_capacity": 1
       }
     }
   }
