@@ -618,7 +618,7 @@ class PrimeVideoXRayStack(Stack):
                 path="/",
                 protocol=aws_elasticloadbalancingv2.Protocol.HTTP,
                 timeout=Duration.seconds(15),
-                interval=Duration.minutes(30),
+                interval=Duration.minutes(5),
             ),
         )
 
