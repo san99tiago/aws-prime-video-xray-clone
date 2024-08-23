@@ -5,12 +5,16 @@ import os
 from aws_cdk import (
     Duration,
     aws_autoscaling,
+    aws_certificatemanager,
     aws_ec2,
     aws_dynamodb,
+    aws_elasticloadbalancingv2,
+    aws_events,
+    aws_iam,
     aws_lambda,
     aws_logs,
-    aws_iam,
-    aws_events,
+    aws_route53,
+    aws_route53_targets,
     aws_s3,
     aws_sqs,
     aws_stepfunctions as aws_sfn,
@@ -62,11 +66,21 @@ class PrimeVideoXRayStack(Stack):
         self.create_state_machine()
         self.create_event_bridge_rules()
 
-        # Methods for the frontend resources
+        # Methods for the frontend UI resources
         self.import_networking_resources()
         self.create_security_groups()
         self.create_roles()
         self.create_servers()
+
+        # !Only enable this section if you have a custom domain for the application
+        # You have to already own the Route53 hosted zone, otherwise, it will fail!
+        if self.app_config["enable_custom_domain"]:
+            self.create_alb()
+            self.import_route_53_hosted_zone()
+            self.configure_acm_certificate()
+            self.configure_alb_listeners()
+            self.configure_target_groups()
+            self.configure_route_53_records()
 
         # Methods for the IAM permissions
         self.configure_iam_permissions()
@@ -420,21 +434,39 @@ class PrimeVideoXRayStack(Stack):
         """
         Method to create security groups for the UI.
         """
-        self.sg = aws_ec2.SecurityGroup(
+        # ALB Security Group on port 443 (HTTPS)
+        self.sg_alb = aws_ec2.SecurityGroup(
             self,
-            "SG",
+            "SG-ALB",
             vpc=self.vpc,
-            security_group_name=f"{self.app_config['asg_name']}-sg",
-            description=f"Security group for {self.app_config['asg_name']} UI servers",
+            security_group_name=f"{self.app_config['short_name']}-alb-sg",
+            description=f"Security group for {self.app_config['short_name']} UI ALB",
             allow_all_outbound=True,
         )
         self.sg_cidrs_list = self.app_config["sg_cidrs_list"]
         for cidr in self.sg_cidrs_list:
-            self.sg.add_ingress_rule(
+            self.sg_alb.add_ingress_rule(
                 peer=aws_ec2.Peer.ipv4(cidr),
-                connection=aws_ec2.Port.tcp(80),
-                description=f"Allow HTTP access for {cidr} CIDR",
+                connection=aws_ec2.Port.tcp(443),
+                description=f"Allow HTTPS traffic to ALB for {cidr} CIDR",
             )
+
+        # ASG Security Group
+        self.sg_asg = aws_ec2.SecurityGroup(
+            self,
+            "SG",
+            vpc=self.vpc,
+            security_group_name=f"{self.app_config['short_name']}-asg-sg",
+            description=f"Security group for {self.app_config['short_name']} UI ASG",
+            allow_all_outbound=True,
+        )
+
+        # Allow inbound traffic from ALB to ASG on port 80 (HTTP)
+        self.sg_alb.connections.allow_from(
+            self.sg_asg,
+            port_range=aws_ec2.Port.tcp(80),
+            description="Allow HTTP traffic from ALB to ASG",
+        )
 
     def create_roles(self):
         """
@@ -443,8 +475,8 @@ class PrimeVideoXRayStack(Stack):
         self.instance_role = aws_iam.Role(
             self,
             "InstanceRole",
-            role_name=f"{self.app_config['asg_name']}-instance-role",
-            description=f"Role for {self.app_config['asg_name']} servers",
+            role_name=f"{self.app_config['short_name']}-instance-role",
+            description=f"Role for {self.app_config['short_name']} servers",
             assumed_by=aws_iam.ServicePrincipal("ec2.amazonaws.com"),
             managed_policies=[
                 # aws_iam.ManagedPolicy.from_aws_managed_policy_name(
@@ -466,20 +498,17 @@ class PrimeVideoXRayStack(Stack):
         self.asg = aws_autoscaling.AutoScalingGroup(
             self,
             "ASG",
-            auto_scaling_group_name=self.app_config["asg_name"],
+            auto_scaling_group_name=self.app_config["short_name"],
             vpc=self.vpc,
             vpc_subnets=aws_ec2.SubnetSelection(
                 subnet_type=aws_ec2.SubnetType.PUBLIC,
             ),
-            instance_type=aws_ec2.InstanceType.of(
-                aws_ec2.InstanceClass.T3,  # For prod usage, migrate to M5
-                aws_ec2.InstanceSize.MICRO,
-            ),
+            instance_type=aws_ec2.InstanceType(self.app_config["instance_type"]),
             machine_image=aws_ec2.MachineImage.latest_amazon_linux2(),
             min_capacity=self.app_config["min_capacity"],
             max_capacity=self.app_config["max_capacity"],
             desired_capacity=self.app_config["desired_capacity"],
-            security_group=self.sg,
+            security_group=self.sg_asg,
             role=self.instance_role,
         )
 
@@ -524,3 +553,100 @@ class PrimeVideoXRayStack(Stack):
         # Grant permissions to the ASG instances to access S3 and DynamoDB
         self.s3_bucket.grant_read_write(self.asg)
         self.dynamodb_table.grant_read_write_data(self.asg)
+
+    def create_alb(self):
+        """
+        Method to create the Application Load Balancer for the UI.
+        """
+        self.alb = aws_elasticloadbalancingv2.ApplicationLoadBalancer(
+            self,
+            "ALB",
+            vpc=self.vpc,
+            internet_facing=True,
+            load_balancer_name=self.app_config["short_name"],
+            security_group=self.sg_alb,
+        )
+
+    def import_route_53_hosted_zone(self):
+        """
+        Method to import the Route 53 hosted zone for the application.
+        """
+        # IMPORTANT: The hosted zone must be already created in Route 53!
+        self.hosted_zone_name = self.app_config["hosted_zone_name"]
+        self.domain_name = f"prime.{self.hosted_zone_name}"
+        self.hosted_zone = aws_route53.HostedZone.from_lookup(
+            self,
+            "HostedZone",
+            domain_name=self.hosted_zone_name,
+        )
+
+    def configure_acm_certificate(self):
+        """
+        Method to configure the SSL certificate for the ALB.
+        """
+        self.certificate = aws_certificatemanager.Certificate(
+            self,
+            "Certificate",
+            domain_name=self.domain_name,
+            validation=aws_certificatemanager.CertificateValidation.from_dns(
+                hosted_zone=self.hosted_zone,
+            ),
+        )
+
+    def configure_alb_listeners(self):
+        """
+        Method to configure the ALB listeners for the UI.
+        """
+        self.https_listener = self.alb.add_listener(
+            "ALB-HTTPS-Listener",
+            open=True,
+            port=443,
+            protocol=aws_elasticloadbalancingv2.ApplicationProtocol.HTTPS,
+            certificates=[self.certificate],
+        )
+
+    def configure_target_groups(self):
+        """
+        Method to configure the target groups for the ALB.
+        """
+        self.https_listener_target_group = self.https_listener.add_targets(
+            "ALB-HTTPS-TargetGroup",
+            port=80,  # Intentionally set to 80 for the ASG
+            protocol=aws_elasticloadbalancingv2.ApplicationProtocol.HTTP,  # Intentionally set to HTTP for the ASG
+            targets=[self.asg],
+            health_check=aws_elasticloadbalancingv2.HealthCheck(
+                path="/",
+                protocol=aws_elasticloadbalancingv2.Protocol.HTTP,
+                timeout=Duration.seconds(15),
+                interval=Duration.minutes(30),
+            ),
+        )
+
+    def configure_route_53_records(self):
+        """
+        Method to configure the Route 53 records for the ALB.
+        """
+        aws_route53.ARecord(
+            self,
+            "ALB-Record",
+            zone=self.hosted_zone,
+            target=aws_route53.RecordTarget.from_alias(
+                aws_route53_targets.LoadBalancerTarget(self.alb)
+            ),
+            record_name=self.domain_name,
+            comment=f"ALB DNS for {self.domain_name} for {self.app_config['short_name']} application",
+        )
+
+        # Outputs for the custom domain and ALB DNS
+        CfnOutput(
+            self,
+            "APP-DNS",
+            value=f"https://{self.domain_name}",
+            description="Application custom DNS",
+        )
+        CfnOutput(
+            self,
+            "ALB-DNS",
+            value=f"https://{self.alb.load_balancer_dns_name}",
+            description="ALB DNS",
+        )

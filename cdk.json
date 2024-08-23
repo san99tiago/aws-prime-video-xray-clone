@@ -11,13 +11,30 @@
       "dev": {
         "deployment_environment": "dev",
         "log_level": "DEBUG",
-        "s3_bucket_prefix": "prime-video-xray",
-        "table_name": "prime-video-xray",
-        "asg_name": "prime-xray",
+        "s3_bucket_prefix": "amazon-prime-video-xray",
+        "table_name": "amazon-prime-video-xray",
+        "short_name": "prime-xray",
         "sg_cidrs_list": ["0.0.0.0/0"],
+        "instance_type": "t3.micro",
         "min_capacity": 1,
         "max_capacity": 1,
-        "desired_capacity": 1
+        "desired_capacity": 1,
+        "enable_custom_domain": true,
+        "hosted_zone_name": "dev.san99tiago.com"
+      },
+      "prod": {
+        "deployment_environment": "prod",
+        "log_level": "DEBUG",
+        "s3_bucket_prefix": "amazon-prime-video-xray",
+        "table_name": "amazon-prime-video-xray",
+        "short_name": "prime-xray",
+        "sg_cidrs_list": ["0.0.0.0/0"],
+        "instance_type": "m5.large",
+        "min_capacity": 1,
+        "max_capacity": 1,
+        "desired_capacity": 1,
+        "enable_custom_domain": true,
+        "hosted_zone_name": "san99tiago.com"
       }
     }
   }
