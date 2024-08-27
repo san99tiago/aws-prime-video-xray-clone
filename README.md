@@ -8,6 +8,12 @@ Fun OpenSource project to illustrate how "Amazon Prime Video X-Ray Functionality
 
 <img src="assets/aws-prime-video-xray-clone-architecture.png" width=90%> <br>
 
+## Event Pictures 💥
+
+Here are some images when hosting the live event at the AWS Community Day Colombia 2024:
+
+<img src="assets/event_01.png" width=53%><img src="assets/event_02.png" width=46%>
+
 ## Example Results
 
 You will obtain an interactive UI to upload videos and then get the detected elements from each scene:
